@@ -8,17 +8,15 @@ class ImageAugmentorApp:
         self.root = root
         self.root.title("Итоговая работа")
 
-        # UI Frames
         self.left_frame = Frame(root, width=200, bg="lightgray")
         self.left_frame.pack(side="left", fill="y")
-
         self.right_frame = Frame(root, width=400)
         self.right_frame.pack(side="right", fill="both", expand=True)
 
         self.images = []
         self.augmented_images = []
         self.pipeline = AugmentationPipeline()
-
+        self.current_index = 0
         self.rotation_var = IntVar()
         self.flip_var = IntVar()
         self.flip_v_var = IntVar()
@@ -41,7 +39,13 @@ class ImageAugmentorApp:
         self.canvas = Canvas(self.right_frame, width=400, height=300)
         self.canvas.pack()
 
-# region  controls
+        self.nav_frame = Frame(self.right_frame)
+        self.nav_frame.pack(side="bottom", fill="x", pady=10)
+
+        Button(self.nav_frame, text="Прошлая", command=self.show_previous_image).pack(side="left", padx=10)
+        Button(self.nav_frame, text="Следующая", command=self.show_next_image).pack(side="right", padx=10)
+
+    # region  controls
 
     def clear_controls(self):
         for widget in self.control_frame.winfo_children():
@@ -50,8 +54,7 @@ class ImageAugmentorApp:
     def show_rotation_controls(self):
         self.clear_controls()
         Label(self.control_frame, text="Настройка поворота").pack()
-        Scale(self.control_frame, from_=0, to=90, orient="horizontal",
-              label="Rotation (degrees)", variable=self.rotation_var).pack()
+        Scale(self.control_frame, from_=0, to=90, orient="horizontal", label="Поворот (градус)", variable=self.rotation_var).pack()
         Button(self.control_frame, text="Применить", command=self.apply_augmentation).pack()
         Button(self.control_frame, text="Сбросить", command=self.reset_image).pack()
 
@@ -105,53 +108,53 @@ class ImageAugmentorApp:
     def apply_noise(self):
         "Применяет шум."
         self.pipeline.add_noise(self.rotation_var.get())
-        self.get_preview_image()
+        self.show_preview_image()
 
     def apply_mean_filter(self):
         "Применяет усреднение для удаления шума."
         self.pipeline.add_noise(self.rotation_var.get())
         self.pipeline.remove_noise_mean()
-        self.get_preview_image()
+        self.show_preview_image()
 
     def apply_gaussian_filter(self):
         "Применяет фильтр Гаусса для удаления шума."
         self.pipeline.remove_noise_gaussian()
-        self.get_preview_image()
+        self.show_preview_image()
 
     def apply_histogram_equalization(self):
         "Применяет эквализацию гистограммы."
         self.pipeline.histogram_equalization()
-        self.get_preview_image()
+        self.show_preview_image()
 
     def apply_color_correction(self):
         "Применяет статистическую цветокоррекцию."
         self.pipeline.statistical_color_correction(strength=self.rotation_var.get())
-        self.get_preview_image()
+        self.show_preview_image()
 
     def apply_glass_effect(self):
         "Применяет эффект стекла."
         self.pipeline.add_glass_effect()
-        self.get_preview_image()
+        self.show_preview_image()
 
     def apply_translation(self):
         "Применяет перенос."
         self.pipeline.add_translation()
-        self.get_preview_image()
+        self.show_preview_image()
 
     def apply_wave1(self):
         "Применяет поворот волна 1."
         self.pipeline.add_rotation_wave1()
-        self.get_preview_image()
+        self.show_preview_image()
 
     def apply_wave2(self):
         "Применяет поворот волна 2."
         self.pipeline.add_rotation_wave2()
-        self.get_preview_image()
+        self.show_preview_image()
 
     def apply_motion_blur(self):
         "Применяет motion blur."
         self.pipeline.add_motion_blur(kernel_size=self.rotation_var.get())
-        self.get_preview_image()
+        self.show_preview_image()
 # endregion
 
     def load_dataset(self):
@@ -167,11 +170,11 @@ class ImageAugmentorApp:
             self.pipeline.add_rotation(self.rotation_var.get())
         if self.flip_var.get() or self.flip_v_var.get():
             self.pipeline.add_flip(self.flip_var.get(), self.flip_v_var.get())
-        self.get_preview_image()
+        self.show_preview_image()
 
     def reset_image(self):
         self.pipeline = AugmentationPipeline()
-        self.get_preview_image()
+        self.show_preview_image()
 
     def save_augmented_images(self):
         directory = filedialog.askdirectory(title="Select Save Directory")
@@ -188,14 +191,28 @@ class ImageAugmentorApp:
         self.canvas.create_image(200, 150, image=photo)
         self.root.image = photo
 
-    def get_preview_image(self):
-        self.augmented_images = self.pipeline.apply([self.images[0]])
+    def show_preview_image(self):
+        self.augmented_images = self.pipeline.apply([self.images[self.current_index]])
         self.show_image(self.augmented_images[0])
 
     def show_temporary_message(self, text):
         message_label = Label(self.right_frame, text=text, fg="green")
         message_label.pack()
         self.root.after(5000, message_label.destroy)
+
+    def show_next_image(self):
+        """Отображает следующее изображение."""
+        if self.images and self.current_index < len(self.images) - 1:
+            self.current_index += 1
+            self.show_image(self.images[self.current_index])
+            self.show_preview_image()
+
+    def show_previous_image(self):
+        """Отображает предыдущее изображение."""
+        if self.images and self.current_index > 0:
+            self.current_index -= 1
+            self.show_image(self.images[self.current_index])
+            self.show_preview_image()
 
 
 if __name__ == "__main__":
