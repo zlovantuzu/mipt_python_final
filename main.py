@@ -158,11 +158,11 @@ class ImageAugmentorApp:
 # endregion
 
     def load_dataset(self):
-        directory = filedialog.askdirectory(title="Select Dataset Directory")
+        directory = filedialog.askdirectory(title="Выбрать директорию загрузки")
         if directory:
             loader = ImageLoader(directory)
             self.images = loader.load_images()
-            self.show_temporary_message(f"Loaded {len(self.images)} images")
+            self.show_temporary_message(f"Загружено {len(self.images)} картинок")
 
     def apply_augmentation(self):
         self.pipeline = AugmentationPipeline()
@@ -177,12 +177,12 @@ class ImageAugmentorApp:
         self.show_preview_image()
 
     def save_augmented_images(self):
-        directory = filedialog.askdirectory(title="Select Save Directory")
+        directory = filedialog.askdirectory(title="Выбрать директорию сохранения")
         if directory and self.augmented_images:
             saver = ImageSaver(directory)
             self.augmented_images = self.pipeline.apply(self.images)
             saver.save_images(self.augmented_images)
-            self.show_temporary_message(f"Saved {len(self.augmented_images)} images!")
+            self.show_temporary_message(f"Сохранено {len(self.augmented_images)} картинок")
 
     def show_image(self, image):
         image.thumbnail((400, 300))
@@ -201,14 +201,14 @@ class ImageAugmentorApp:
         self.root.after(5000, message_label.destroy)
 
     def show_next_image(self):
-        """Отображает следующее изображение."""
+        "Отображает следующее изображение."
         if self.images and self.current_index < len(self.images) - 1:
             self.current_index += 1
             self.show_image(self.images[self.current_index])
             self.show_preview_image()
 
     def show_previous_image(self):
-        """Отображает предыдущее изображение."""
+        "Отображает предыдущее изображение."
         if self.images and self.current_index > 0:
             self.current_index -= 1
             self.show_image(self.images[self.current_index])
