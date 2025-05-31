@@ -1,10 +1,20 @@
 from tkinter import Tk, Label, Button, filedialog, Frame, Scale, IntVar, Checkbutton, Canvas
 from augmentor.augmentation import ImageLoader, AugmentationPipeline, ImageSaver
 from PIL import ImageTk
+import sqlite3
+from datetime import datetime
+from tkinter.ttk import Treeview
+from cell_counter.classical_methods.classical_counter import count_cells_classical
+from cell_counter.texture_based_ml.ml_counter import count_cells_ml
+from cell_counter.cnn_deep_learning.cnn_counter import count_cells_cnn
 
 
 class ImageAugmentorApp:
     def __init__(self, root):
+
+        self.db_conn = sqlite3.connect("experiments.db")
+        self.create_experiments_table()
+
         self.root = root
         self.root.title("Итоговая работа")
 
@@ -29,6 +39,7 @@ class ImageAugmentorApp:
         Button(self.left_frame, text="Удаление шума", command=self.show_denoise_controls).pack(fill="x", pady=5)
         Button(self.left_frame, text="Гисторгаммы", command=self.show_histogram_controls).pack(fill="x", pady=5)
         Button(self.left_frame, text="Геометрические", command=self.show_geometric_controls).pack(fill="x", pady=5)
+        Button(self.left_frame, text="Подсчёт клеток", command=self.show_count_controls).pack(fill="x", pady=5)
         Frame(self.left_frame, height=4, bd=1, relief="sunken", bg="gray").pack(fill="x", pady=5)
         Button(self.left_frame, text="Загрузить", command=self.load_dataset).pack(fill="x", pady=5)
         Button(self.left_frame, text="Сохранить", command=self.save_augmented_images).pack(fill="x", pady=5)
@@ -102,7 +113,17 @@ class ImageAugmentorApp:
         Scale(self.control_frame, from_=1, to=30, orient="horizontal", label="Сила размытия в движении", length=200, variable=self.rotation_var).pack()
         Button(self.control_frame, text="Применить", command=self.apply_motion_blur).pack()
         Button(self.control_frame, text="Сбросить", command=self.reset_image).pack()
-# endregion
+
+    def show_count_controls(self):
+        self.clear_controls()
+        Label(self.control_frame, text="Подсчёт клеток").pack()
+        Button(self.control_frame, text="Метод 1 (Classic)", command=self.apply_classical_count).pack()
+        Button(self.control_frame, text="Метод 2 (ML)", command=self.apply_ml_count).pack()
+        Button(self.control_frame, text="Метод 3 (CNN)", command=self.apply_cnn_count).pack()
+        Button(self.control_frame, text="Все методы", command=self.apply_all_count).pack()
+        Button(self.control_frame, text="Показать таблицу", command=self.show_results_table).pack()
+
+    # endregion
 
 # region  funcs
     def apply_noise(self):
@@ -155,7 +176,81 @@ class ImageAugmentorApp:
         "Применяет motion blur."
         self.pipeline.add_motion_blur(kernel_size=self.rotation_var.get())
         self.show_preview_image()
-# endregion
+
+    def apply_classical_count(self):
+        "Применяет классический метод подсчёта клеток."
+        augmented_images = self.pipeline.apply([self.images[self.current_index]])
+        result = count_cells_classical(augmented_images[0])
+        self.save_result(method1=result)
+        self.show_temporary_message(f"Классический метод: найдено {result} клеток")
+
+    def apply_ml_count(self):
+        "Применяет ML-метод подсчёта клеток."
+        augmented_images = self.pipeline.apply([self.images[self.current_index]])
+        result = count_cells_ml(augmented_images[0])
+        self.save_result(method2=result)
+        self.show_temporary_message(f"ML метод: найдено {result} клеток")
+
+    def apply_cnn_count(self):
+        "Применяет CNN-метод подсчёта клеток."
+        augmented_images = self.pipeline.apply([self.images[self.current_index]])
+        result = count_cells_cnn(augmented_images[0])
+        self.save_result(method3=result)
+        self.show_temporary_message(f"CNN метод: найдено {result} клеток")
+
+    def apply_all_count(self):
+        "Применяет CNN-метод подсчёта клеток."
+        augmented_images = self.pipeline.apply([self.images[self.current_index]])
+        result1 = count_cells_classical(augmented_images[0])
+        result2 = count_cells_ml(augmented_images[0])
+        result3 = count_cells_cnn(augmented_images[0])
+        self.save_result(method1=result1, method2=result2, method3=result3)
+        self.show_temporary_message(f"Классический метод: найдено {result1} клеток, ML метод: найдено {result2} клеток, CNN метод: найдено {result3} клеток")
+
+    # endregion
+
+    def create_experiments_table(self):
+        cursor = self.db_conn.cursor()
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS experiments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT,
+            file_path TEXT,
+            gen_params TEXT,
+            method1_result INTEGER,
+            method2_result INTEGER,
+            method3_result INTEGER
+        )''')
+        self.db_conn.commit()
+
+    def save_result(self, method1=None, method2=None, method3=None):
+        cursor = self.db_conn.cursor()
+        file_path = getattr(self.images[self.current_index], "filename", "unknown")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute('''
+                       INSERT INTO experiments (date, file_path, gen_params, method1_result, method2_result, method3_result)
+                       VALUES (?, ?, ?, ?, ?, ?)
+                       ''', (now, file_path, '', method1, method2, method3))
+        self.db_conn.commit()
+        self.show_temporary_message("Результат сохранён.")
+
+    def show_results_table(self):
+        top = Tk()
+        top.title("Результаты экспериментов")
+
+        tree = Treeview(top, columns=("ID", "Date", "File", "M1", "M2", "M3"), show="headings")
+        tree.heading("ID", text="ID")
+        tree.heading("Date", text="Дата")
+        tree.heading("File", text="Файл")
+        tree.heading("M1", text="Метод 1")
+        tree.heading("M2", text="Метод 2")
+        tree.heading("M3", text="Метод 3")
+        tree.pack(fill="both", expand=True)
+
+        cursor = self.db_conn.cursor()
+        cursor.execute("SELECT id, date, file_path, method1_result, method2_result, method3_result FROM experiments")
+        for row in cursor.fetchall():
+            tree.insert("", "end", values=row)
 
     def load_dataset(self):
         directory = filedialog.askdirectory(title="Выбрать директорию загрузки")
